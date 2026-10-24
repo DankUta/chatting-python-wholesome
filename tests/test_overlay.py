@@ -8,7 +8,7 @@ from PIL import Image
 from chatting.config import FontsConfig
 from chatting.models import RankedSong, Song
 from chatting.overlay import (
-    BOX_W, HEIGHT, VID_H, VID_W, VID_X, VID_Y, WIDTH, build_overlays, compose_preview, grade_text,
+    BOX_W, HEIGHT, MAX_BODY_H, VID_H, VID_W, VID_X, VID_Y, WIDTH, build_overlays, compose_preview, grade_text, _pack,
 )
 from chatting.text import FontSet
 
@@ -154,3 +154,57 @@ def test_dense_and_sparse_previews(tmp_path, fonts):
               voters[3]: "Not my thing but the guitar is good"}
     plan = build_overlays(make_item(voters, sparse), voters, avatar(tmp_path), fonts, 15, tmp_path, "s")
     compose_preview(plan)[0].save(out / "preview_sparse.png")
+
+
+LONG = " ".join(f"word{i}{'😀' if i % 9 == 0 else ''}" for i in range(120))   # ~720 characters
+
+
+def test_long_comment_is_split_not_truncated(tmp_path, fonts):
+    voters = voters_of(4)
+    assert len(LONG) >= 700
+    plan = build_overlays(make_item(voters, {"Voter1": LONG}), voters, None, fonts, 15, tmp_path, "long",
+                          warn=lambda m: None)
+    boxes = plan.boxes
+    assert len(boxes) > 1
+    assert not any(line.endswith("…") for box in boxes for line in box.lines)
+    assert all(box.body_h <= MAX_BODY_H for box in boxes)
+    n = len(boxes)
+    assert [b.header for b in boxes] == [f"Voter1 ({k}/{n})" for k in range(1, n + 1)]
+    words = " ".join(" ".join(b.lines) for b in boxes).split()
+    assert words == LONG.split()
+    for path, _, _ in plan.pages:
+        assert box_pixels_inside(path)
+
+
+def test_continuation_boxes_follow_the_first(tmp_path, fonts):
+    voters = voters_of(6)
+    comments = {"Voter1": LONG, "Voter2": "short", "Voter3": LONG}
+    plan = build_overlays(make_item(voters, comments), voters, None, fonts, 15, tmp_path, "cont",
+                          warn=lambda m: None)
+    placed = [(page_no, b, x, y) for page_no, page in enumerate(_pack(plan.boxes))
+              for b, x, y in page]
+    assert len(placed) == len(plan.boxes)
+    for voter in ("Voter1", "Voter3"):
+        pages = [p for p, b, _, _ in placed if b.voter == voter]
+        assert pages == sorted(pages)
+        first = next(pl for pl in placed if pl[1].voter == voter)
+        for p, b, x, y in placed:
+            if b.voter == voter and b is not first[1]:
+                assert p > first[0] or (p == first[0] and (x, y) != (first[2], first[3]))
+                assert b.header > voter   # continuation headers carry the "(k/n)" suffix
+
+
+def test_warns_when_pages_are_too_short(tmp_path, fonts):
+    seen = []
+    voters = voters_of(21)
+    medium = "This song absolutely slaps, the second verse is unreal and the bridge made me cry"
+    comments = {v: medium for v in voters[1:]}
+    plan = build_overlays(make_item(voters, comments), voters, None, fonts, 15, tmp_path, "w1",
+                          warn=seen.append)
+    assert len(plan.pages) > 3
+    assert len(seen) == 1
+    assert "#12 Some Artist - Some Song" in seen[0] and "clip_seconds" in seen[0]
+    quiet = []
+    short = {"Voter1": "nice", "Voter2": "ok", "Voter3": "wow"}
+    build_overlays(make_item(voters, short), voters, None, fonts, 15, tmp_path, "w2", warn=quiet.append)
+    assert quiet == []

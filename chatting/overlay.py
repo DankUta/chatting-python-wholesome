@@ -8,12 +8,13 @@ pages are shown one after another so every comment gets read.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from PIL import Image, ImageDraw
 
+from . import log
 from .config import FontsConfig
 from .models import RankedSong
 from .text import FontSet, get_fontset
@@ -60,12 +61,14 @@ BOX_MIN_FONT = 18
 MAX_BODY_H = 300
 BOX_GAP = 14
 BOX_MARGIN = 12                # distance from the video box edge
+MIN_PAGE_SECONDS = 4.0         # below this per page, warn that comments are hard to read
 
 
 @dataclass
 class OverlayPlan:
     base: Path
     pages: list   # [(png path, start seconds, end seconds)]
+    boxes: list = field(default_factory=list)   # every comment box drawn, in reading order
 
 
 @dataclass
@@ -74,6 +77,7 @@ class _Box:
     lines: list
     font: int
     body_h: int
+    header: str = ""   # text in the header strip; the voter's name unless the comment is split
 
     @property
     def height(self) -> int:
@@ -163,23 +167,31 @@ def _draw_panels(img: Image.Image, item: RankedSong, voters: list, fonts: FontSe
         fonts.draw(img, (WIDTH - PANEL_NAME_EDGE, y), voter, name_size(voter), WHITE, anchor="rm")
 
 
-def _make_box(voter: str, comment: str, fonts: FontSet) -> _Box:
+def _make_box(voter: str, comment: str, fonts: FontSet) -> list:
+    """One box per comment, or several consecutive boxes when it is too long for one."""
     room = BOX_W - 2 * BOX_PAD_X
-    last = None
     for size in range(BOX_FONT, BOX_MIN_FONT - 1, -1):
         lines = fonts.wrap(comment, size, room)
         line_h = fonts.measure("Ag", size)[1]
         body_h = len(lines) * line_h + 2 * BOX_PAD_Y
-        last = (size, lines, line_h)
         if body_h <= MAX_BODY_H:
-            return _Box(voter, lines, size, body_h)
-    size, lines, line_h = last
+            return [_Box(voter, lines, size, body_h, voter)]
+    # too tall even at the minimum font: split the lines over several boxes
+    size = BOX_MIN_FONT
+    line_h = fonts.measure("Ag", size)[1]
+    lines = []
+    for line in fonts.wrap(comment, size, room):
+        if fonts.measure(line, size)[0] > room:   # last resort: a single glyph that can't fit
+            while line and fonts.measure(line + "…", size)[0] > room:
+                line = line[:-1]
+            line = line.rstrip() + "…"
+        lines.append(line)
     fit = max(1, (MAX_BODY_H - 2 * BOX_PAD_Y) // line_h)
-    lines = lines[:fit]
-    while lines[-1] and fonts.measure(lines[-1] + "…", size)[0] > room:
-        lines[-1] = lines[-1][:-1]
-    lines[-1] = lines[-1].rstrip() + "…"
-    return _Box(voter, lines, size, len(lines) * line_h + 2 * BOX_PAD_Y)
+    chunks = [lines[i:i + fit] for i in range(0, len(lines), fit)]
+    total = len(chunks)
+    return [_Box(voter, chunk, size, len(chunk) * line_h + 2 * BOX_PAD_Y,
+                 f"{voter} ({k}/{total})" if total > 1 else voter)
+            for k, chunk in enumerate(chunks, 1)]
 
 
 def _pack(boxes: list) -> list:
@@ -214,8 +226,9 @@ def _draw_page(boxes: list, fonts: FontSet) -> Image.Image:
     draw = ImageDraw.Draw(img)
     for box, x, y in boxes:
         draw.rectangle([x, y, x + BOX_W - 1, y + BOX_HEADER_H - 1], fill=WHITE)
-        size = fonts.fit_size(box.voter, BOX_W - 12, BOX_HEADER_FONT, 12, bold=True)
-        fonts.draw(img, (x + BOX_W // 2, y + BOX_HEADER_H // 2), box.voter, size, BLACK,
+        header = box.header or box.voter
+        size = fonts.fit_size(header, BOX_W - 12, BOX_HEADER_FONT, 12, bold=True)
+        fonts.draw(img, (x + BOX_W // 2, y + BOX_HEADER_H // 2), header, size, BLACK,
                    bold=True, anchor="mm")
         body_y = y + BOX_HEADER_H
         draw.rectangle([x, body_y, x + BOX_W - 1, body_y + box.body_h - 1], fill=YELLOW)
@@ -225,7 +238,8 @@ def _draw_page(boxes: list, fonts: FontSet) -> Image.Image:
 
 
 def build_overlays(item: RankedSong, voters: list, avatar: Optional[Path], fonts: FontSet,
-                   clip_seconds: float, out_dir: Path, name: str) -> OverlayPlan:
+                   clip_seconds: float, out_dir: Path, name: str,
+                   warn: Callable[[str], None] = log.warn) -> OverlayPlan:
     """Write `<name>_base.png` and `<name>_comments_<k>.png` into `out_dir`."""
     out_dir.mkdir(parents=True, exist_ok=True)
     base = Image.new("RGBA", (WIDTH, HEIGHT), BLACK)
@@ -246,14 +260,19 @@ def build_overlays(item: RankedSong, voters: list, avatar: Optional[Path], fonts
     for voter in voters:
         comment = (item.comments.get(voter) or "").strip()
         if comment:
-            boxes.append(_make_box(voter, comment, fonts))
+            boxes.extend(_make_box(voter, comment, fonts))
     pages = _pack(boxes)
     plan_pages = []
     for k, page in enumerate(pages):
         path = out_dir / f"{name}_comments_{k}.png"
         _draw_page(page, fonts).save(path)
         plan_pages.append((path, k * clip_seconds / len(pages), (k + 1) * clip_seconds / len(pages)))
-    return OverlayPlan(base=base_path, pages=plan_pages)
+    if pages and clip_seconds / len(pages) < MIN_PAGE_SECONDS:
+        warn(f"#{item.rank} {item.song.label}: {len(pages)} comment pages of "
+             f"{clip_seconds / len(pages):.1f} s each — hard to read; "
+             f"consider a longer [video] clip_seconds")
+    return OverlayPlan(base=base_path, pages=plan_pages,
+                       boxes=boxes)
 
 
 def compose_preview(plan: OverlayPlan, frame: Optional[Image.Image] = None) -> list:
