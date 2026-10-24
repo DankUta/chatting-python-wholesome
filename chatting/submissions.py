@@ -44,7 +44,7 @@ _SUBMITTED_AT = {
 }
 _LINK_KW = r"link|url|youtube|\byt\b"
 _ARTIST_KW = r"artist|singer|band|artist[aă]|interpret"
-_TITLE_KW = r"title|name|titlu|song|piesa|piesă|melodie"
+_TITLE_KW = r"title|titlu|song|track|piesa|piesă|melodie"
 _TITLE_REPEAT_KW = r"title|titlu|song|piesa|piesă|melodie"
 _PICTURE_KW = r"picture|pfp|avatar|photo|image|profile|poz[aă]|imagine|poza"
 _NAME_KW = r"name|nickname|username|discord|nume|porecl|who are you"
@@ -64,6 +64,7 @@ _ORDINALS = {"first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3,
 
 
 def _slot_of(header: str) -> Optional[int]:
+    header = re.sub(r"\([^)]*\)", " ", header)      # "Name (2 words max)" has no song number
     m = re.search(r"\b(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\b", header, re.I)
     if m:
         return _ORDINALS[m.group(1).lower()]
@@ -149,6 +150,17 @@ def detect_columns(
         if cm.picture:
             taken.add(cm.picture)
 
+    if not cm.name:
+        cands = [
+            h for h in free()
+            if _has(_NAME_KW, h) and not _has(_SONG_WORDS, h) and not _has(r"e-?mail", h)
+        ]
+        exact = [h for h in cands if _norm(h) in ("name", "nickname", "nume")]
+        pick = (exact or cands or [None])[0]
+        cm.name = pick
+        if pick:
+            taken.add(pick)
+
     # numbered song columns: link, then artist, then title
     for target, kw, given in (
         (cm.links, _LINK_KW, bool(overrides.song_link)),
@@ -182,14 +194,6 @@ def detect_columns(
                 target[i] = h
                 taken.add(h)
 
-    if not cm.name:
-        cands = [
-            h for h in free()
-            if _has(_NAME_KW, h) and not _has(_SONG_WORDS, h) and not _has(r"e-?mail", h)
-        ]
-        exact = [h for h in cands if _norm(h) in ("name", "nickname", "nume")]
-        pick = (exact or cands or [None])[0]
-        cm.name = pick
     if not cm.name and not cm.email:
         raise SubmissionError(
             "Could not find a name column in the responses. Set [columns] name in chatting.toml. "

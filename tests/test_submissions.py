@@ -228,3 +228,14 @@ def test_registry_follows_the_song_not_the_form_slot():
     merged = merge_registry(reg, replaced, people, warnings.append)
     assert [(s.id, s.title) for s in merged] == [(1, "A"), (2, "B"), (3, "C")]
     assert any("no longer in the responses" in w for w in warnings)
+
+
+def test_name_question_with_a_digit_is_not_a_song_column():
+    from chatting.config import ColumnsConfig
+
+    headers = ["Timestamp", "Name (2 words max)", "Song 1 title", "Song 1 link",
+               "Song 2 title", "Song 2 link", "Track 3 name", "Song 3 link"]
+    cm = detect_columns(headers, ColumnsConfig())
+    assert cm.name == "Name (2 words max)"
+    assert cm.titles == {1: "Song 1 title", 2: "Song 2 title", 3: "Track 3 name"}
+    assert cm.links == {1: "Song 1 link", 2: "Song 2 link", 3: "Song 3 link"}
