@@ -52,9 +52,12 @@ _TIME = (
 )
 # "1: 0:45", "1. 0:45", "1) 0:45", "song 1 - 0:45", "#1 0:45", "1:0:45" — anywhere in the text,
 # so entries on one line without commas ("1) 1:05 2) 0:30") are found too.
+_FILLER = r"(?:(?:starts?\s+at|starting\s+at|start|at|from|de\s+la|la|@)\s*)?"
 _NUMBERED = re.compile(
-    r"(?<![\d:.])(?:song\s*|#\s*)?([1-9])\s*(?:[:.)=\-–—]|\s)\s*(" + _TIME + r")(?!\d)", re.I
+    r"(?<![\d:.])(?:song\s*|#\s*)?([1-9])\s*(?:[:.)=\-–—]|\s)\s*" + _FILLER
+    + r"(" + _TIME + r")(?!\d)", re.I
 )
+_SONG_MENTION = re.compile(r"(?:song|#)\s*[1-9]", re.I)
 _PLAIN = re.compile(r"(?<![\d:.])(" + _TIME + r")(?!\d)", re.I)
 _RANGE_GAP = re.compile(r"\s*(?:[-–—~]|to|until|pana la|până la)\s*", re.I)
 
@@ -72,6 +75,9 @@ def parse_timestamps_field(text: object, slots: int = 5) -> dict[int, float]:
             found[slot] = t
     if found:
         return found
+    if _SONG_MENTION.search(raw):
+        # It names songs but in a way we can't pair up; guessing by order could swap starts.
+        return {}
     # No numbered entries: unnumbered times in song order; the end of a range is skipped.
     times: list[float] = []
     prev_end = None
