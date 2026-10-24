@@ -383,6 +383,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     log.reset()
     try:
         code = handlers[args.command](cfg, args)
+    except PermissionError as exc:
+        print(f"Error: can't write {exc.filename or 'a file'} — is it open in Excel or another "
+              "program? Close it and run the command again.", file=sys.stderr)
+        return 1
     except KeyboardInterrupt:
         print("\nStopped. Run the same command again to continue — finished clips are kept.", file=sys.stderr)
         return 130

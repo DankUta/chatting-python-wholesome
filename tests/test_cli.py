@@ -165,3 +165,12 @@ def test_compile_flags_voters_without_songs(edition, capsys):
     assert run(edition, "compile") == 0
     err = capsys.readouterr().err
     assert "Rated but didn't submit songs under that name: Calin M, Gabi" in err
+
+
+def test_file_open_in_excel_gives_a_friendly_error(edition, capsys, monkeypatch):
+    def locked(*args, **kwargs):
+        raise PermissionError(13, "Permission denied", "output/rating_sheet.xlsx")
+
+    monkeypatch.setattr("chatting.ratings.write_rating_sheet", locked)
+    assert run(edition, "sheet") == 1
+    assert "is it open in Excel" in capsys.readouterr().err
