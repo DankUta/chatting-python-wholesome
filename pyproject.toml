@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatting"
+version = "2.0.0"
+description = "Song-contest pipeline: Google Form submissions -> rating sheets -> master sheet -> countdown video"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=1.5",
+    "openpyxl>=3.1",
+    "pillow>=10.1",
+    "yt-dlp",
+    "fonttools>=4.40",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+heic = ["pillow-heif"]
+
+[project.scripts]
+chatting = "chatting.cli:main"
+
+[tool.setuptools]
+packages = ["chatting"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: needs ffmpeg and takes a few seconds"]
