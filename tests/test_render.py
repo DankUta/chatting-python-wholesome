@@ -186,9 +186,21 @@ def test_short_local_clip_is_used_from_its_start(tmp_path, clips):
     video = render_video(Results(voters=["Ana", "Bob"], songs=[item]), cfg, {}, download=False,
                          info=notes.append, warn=lambda m: None)
     check_output(video, cfg)
-    assert any("shorter than start" in n for n in notes)
+    assert any("shorter than start" in n and "from 0:00" in n for n in notes)
     exe = find_tool("ffmpeg", cfg)
     out = subprocess.run([exe, "-i", str(video), "-af", "volumedetect", "-vn", "-f", "null", "-"],
                          capture_output=True, text=True).stderr
     max_volume = float(out.split("max_volume:")[1].split("dB")[0])
     assert max_volume > -40
+
+
+def test_unreadable_local_clip_is_ignored(tmp_path):
+    cfg = make_cfg(tmp_path)
+    clips_dir = cfg.path(cfg.input.clips_dir)
+    clips_dir.mkdir(parents=True)
+    (clips_dir / "1.mp4").write_bytes(b"not a video")
+    warns = []
+    video = render_video(Results(voters=["Ana", "Bob"], songs=[make_item(1)]), cfg, {},
+                         download=False, info=lambda m: None, warn=warns.append)
+    check_output(video, cfg)
+    assert any("can't read 1.mp4" in w for w in warns)

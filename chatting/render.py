@@ -197,10 +197,15 @@ def render_video(results: Results, cfg: Config, avatars: dict, ranks: Optional[s
         clip: Optional[Path] = local_clip(song, cfg)
         offset = start if clip is not None else 0.0
         if clip is not None:
-            length = probe(clip, cfg).get("duration")
+            try:
+                length = probe(clip, cfg).get("duration")
+            except ClipError as exc:
+                warn(f"#{item.rank} {song.label}: can't read {clip.name}, ignoring it. {exc}")
+                clip, offset, length = None, 0.0, None
             if length is not None and start + T > length:
-                # Too short to start at the song's timestamp: treat it as already cut.
-                offset = max(0.0, length - T)
+                # A file that ends before the timestamp was cut by hand: play it from the top.
+                # One that just ends too soon after it: take its last T seconds.
+                offset = 0.0 if length <= start else max(0.0, length - T)
                 info(f"    {clip.name} is {format_time(length)} long, shorter than start + "
                      f"{T:g}s — using it from {format_time(offset)}")
         if clip is None and download and downloader is not None:
@@ -213,7 +218,7 @@ def render_video(results: Results, cfg: Config, avatars: dict, ranks: Optional[s
             failed.append((item.rank, song, "no local clip and downloads are off"))
 
         plan = build_overlays(item, results.voters, avatars.get(song.submitter), fonts, T,
-                              overlays_dir, f"{position:03d}")
+                              overlays_dir, f"{position:03d}", warn=warn)
         out = segments_dir / segment_name(position, plan, clip, offset, cfg)
         if not out.exists():
             render_segment(plan, clip, out, cfg, offset)
