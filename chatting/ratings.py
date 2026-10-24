@@ -104,12 +104,19 @@ def parse_rating_value(
     if not m:
         return None, f"can't read '{text}'"
     rest = m.group(2)
+    value = float(m.group(1).replace(",", "."))
+    if rest.startswith("½"):                       # "7½"
+        value, rest = value + 0.5, rest[1:]
     den = re.match(r"^\s*/\s*(\d+(?:[.,]\d+)?)", rest)
-    if den and float(den.group(1).replace(",", ".")) != vmax:
-        return None, f"can't read '{text}'"
-    if re.match(r"^\s*[-–—]\s*\d", rest) or re.match(r"^\d", rest):
-        return None, f"can't read '{text}'"
-    value = round(float(m.group(1).replace(",", ".")), 2)
+    if den:
+        if float(den.group(1).replace(",", ".")) != vmax:
+            return None, f"can't read '{text}'"
+        rest = rest[den.end():]
+    # Another number in the rest ("6 or 7", "7 8", "1:23", "9 (10 for the chorus)") or a
+    # date-like suffix ("4.mai") means the cell doesn't hold one clear rating.
+    if re.search(r"[\d½¼¾:]", rest) or re.match(r"^[.,\-/][^\W\d_]", rest):
+        return None, f"can't read '{text}': write just one number"
+    value = round(value, 2)
     if value < vmin or value > vmax:
         return None, f"{_fmt(value)} is outside {_fmt(vmin)}–{_fmt(vmax)}"
     return value, None

@@ -155,3 +155,15 @@ def test_load_votes_missing_folder(tmp_path):
     warnings = []
     assert load_votes(Config(base_dir=tmp_path), SONGS, People(), warnings.append) == ([], [])
     assert warnings
+
+
+@pytest.mark.parametrize("raw", ["6 or 7", "7 8", "1:23", "4.mai", "9 (10 for the chorus)", "7-8"])
+def test_rating_with_a_second_number_is_reported(raw):
+    value, problem = parse_rating_value(raw)
+    assert value is None and problem
+
+
+@pytest.mark.parametrize("raw,expected", [("7½", 7.5), ("8 (lol)", 8), ("7/10", 7), ("6,78", 6.78),
+                                          ("8. solid", 8), ("10!", 10)])
+def test_rating_with_harmless_extras(raw, expected):
+    assert parse_rating_value(raw) == (expected, None)
