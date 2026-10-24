@@ -144,11 +144,20 @@ def test_load_votes(tmp_path):
     for name, r in (("ana.csv", "5"), ("Bob.csv", "6"), ("Bob (1).csv", "7"), (".hidden.csv", "1"), ("~$lock.xlsx", "1")):
         (folder / name).write_text(f"#,Song,Rating,Comments\n1,Adele - Hello,{r},hi\n", encoding="utf-8")
     (folder / "notes.txt").write_text("ignore")
+    import os
+
+    for name in ("Bob.csv", "Bob (1).csv"):
+        os.utime(folder / name, (1_700_000_000, 1_700_000_000))
     warnings = []
     voters, votes = load_votes(cfg, SONGS, People({"Ana": ["ana"]}), warnings.append)
     assert voters == ["Ana", "Bob"]
+    # Same time: the re-sent "(1)" copy wins.
+    assert [(v.voter, v.rating) for v in votes] == [("Ana", 5), ("Bob", 7)]
+    assert any("using the newest, Bob (1).csv" in w for w in warnings)
+
+    os.utime(folder / "Bob.csv", (1_700_000_100, 1_700_000_100))
+    voters, votes = load_votes(cfg, SONGS, People({"Ana": ["ana"]}), lambda m: None)
     assert [(v.voter, v.rating) for v in votes] == [("Ana", 5), ("Bob", 6)]
-    assert any("more than one" in w for w in warnings)
 
 
 def test_load_votes_missing_folder(tmp_path):

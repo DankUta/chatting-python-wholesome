@@ -122,6 +122,11 @@ def parse_rating_value(
     return value, None
 
 
+def _newest_first(path: Path) -> tuple:
+    m = re.search(r"\((\d+)\)\s*$", path.stem)
+    return (-path.stat().st_mtime, -(int(m.group(1)) if m else 0))
+
+
 def voter_name_from_path(path: Path) -> str:
     stem = Path(path).stem.strip()
     return re.sub(r"\s*\(\d+\)$", "", stem).strip()
@@ -232,14 +237,23 @@ def load_votes(
     sources: list[tuple[str, str]] = []   # (voter, file path or link)
     folder = cfg.path(cfg.input.ratings_dir)
     if folder.is_dir():
-        for p in sorted(folder.iterdir(), key=lambda p: (voter_name_from_path(p).lower(), len(p.stem), p.name.lower())):
+        by_voter: dict[str, list[Path]] = {}
+        for p in sorted(folder.iterdir(), key=lambda p: p.name.lower()):
             if not p.is_file() or p.suffix.lower() not in _SHEET_SUFFIXES:
                 continue
             if p.name.startswith((".", "~$")):
                 continue
             if p.stem.strip().lower().replace("_", " ") == "rating sheet":
                 continue
-            sources.append((voter_name_from_path(p), str(p)))
+            by_voter.setdefault(people.key(voter_name_from_path(p)), []).append(p)
+        for files in by_voter.values():
+            # A re-sent sheet is usually saved as "name (1).xlsx": the newest file wins.
+            files.sort(key=_newest_first)
+            if len(files) > 1:
+                warn(f"{voter_name_from_path(files[0])}: {len(files)} rating sheets "
+                     f"({', '.join(f.name for f in files)}); using the newest, {files[0].name}.")
+            sources.append((voter_name_from_path(files[0]), str(files[0])))
+        sources.sort(key=lambda src: src[0].casefold())
     for name, link in cfg.input.rating_links.items():
         sources.append((name, link))
     if not sources:
@@ -252,7 +266,7 @@ def load_votes(
     for raw_name, src in sources:
         voter = people.canonical(raw_name)
         if people.key(voter) in keys:
-            warn(f"{voter}: more than one rating sheet; using the first one and ignoring {src}.")
+            warn(f"{voter}: more than one rating sheet (a file and a link?); using the first, ignoring {src}.")
             continue
         try:
             grid = read_grid(src, cfg.base_dir)
