@@ -152,3 +152,32 @@ def test_reordered_voter_columns_respected(tmp_path):
     assert back.voters == ["Cy", "Bob", "Ana"] or back.voters == ["Ana", "Bob", "Cy"][::-1]
     forced = read_master(path, PEOPLE, VotingConfig(voter_order=["Bob"]), lambda m: None)
     assert forced.voters[0] == "Bob"
+
+
+def test_start_times_retyped_in_excel(tmp_path):
+    import datetime
+
+    import openpyxl
+
+    from chatting.config import VotingConfig
+    from chatting.master import compile_results, read_master, write_master
+    from chatting.models import Song, Vote
+    from chatting.names import People
+
+    songs = [Song(i, f"T{i}", "A", f"https://youtu.be/{i}", "Ana", start=30) for i in range(1, 5)]
+    votes = [Vote("Bob", i, 7.0) for i in range(1, 5)]
+    path = tmp_path / "master.xlsx"
+    write_master(compile_results(songs, ["Bob"], votes, People(), VotingConfig()), path)
+
+    wb = openpyxl.load_workbook(path)
+    ws = wb["Ranking"]
+    col = [c.value for c in ws[1]].index("Start") + 1
+    assert ws.cell(row=2, column=col).number_format == "@"
+    typed = {1: datetime.time(1, 23), 2: 1.3, 3: datetime.time(0, 1, 5), 4: "2:05"}
+    id_col = [c.value for c in ws[1]].index("ID") + 1
+    for row in range(2, 6):
+        ws.cell(row=row, column=col).value = typed[ws.cell(row=row, column=id_col).value]
+    wb.save(path)
+
+    starts = {r.song.id: r.song.start for r in read_master(path, People(), VotingConfig()).songs}
+    assert starts == {1: 83, 2: 90, 3: 65, 4: 125}

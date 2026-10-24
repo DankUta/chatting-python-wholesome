@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import shutil
 from pathlib import Path
 from typing import Callable, Optional
@@ -127,6 +128,8 @@ def write_master(results: Results, path: Path, title: str = "") -> None:
                    format_time(s.start), s.id])
         row = ws.max_row
         ws.cell(row=row, column=2).number_format = "0.00"
+        # Text, so a start time typed in Excel stays "1:23" instead of becoming 1 h 23 min.
+        ws.cell(row=row, column=8).number_format = "@"
         if s.link.lower().startswith(("http://", "https://")):
             ws.cell(row=row, column=7).hyperlink = s.link
             ws.cell(row=row, column=7).font = Font(color="0563C1", underline="single")
@@ -190,6 +193,23 @@ def _text(value: object) -> str:
     return str(value).strip()
 
 
+def _start(value: object) -> Optional[float]:
+    """Start time from a Start cell, including the shapes Excel turns typed times into."""
+    if isinstance(value, datetime.datetime):
+        value = value.time()
+    if isinstance(value, datetime.timedelta):
+        total = int(value.total_seconds())
+        value = datetime.time((total // 3600) % 24, (total // 60) % 60, total % 60)
+    if isinstance(value, datetime.time):
+        # "1:23" typed into a time cell is stored as 01:23:00; nobody's clip starts an hour in.
+        if value.second == 0:
+            return value.hour * 60 + value.minute
+        return value.hour * 3600 + value.minute * 60 + value.second
+    if isinstance(value, float) and value != int(value):
+        return parse_time(f"{value:.2f}")      # "1.30" typed into a number cell -> 1.3
+    return parse_time(_text(value))
+
+
 def read_master(
     path: Path, people: People, voting: VotingConfig, warn: Callable[[str], None] = log.warn
 ) -> Results:
@@ -229,7 +249,7 @@ def read_master(
             continue
         song = Song(id=sid, title=_text(get(row, "song")), artist=_text(get(row, "artist")),
                     link=_text(get(row, "link")), submitter=people.canonical(_text(get(row, "submitted by"))),
-                    start=parse_time(_text(get(row, "start"))))
+                    start=_start(get(row, "start")))
         songs.append(song)
         cast = votes_by_song.setdefault(sid, {})
         for i, v in voter_cols:
