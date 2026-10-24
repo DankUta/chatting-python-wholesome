@@ -47,6 +47,14 @@ def _num(value: float) -> str:
     return f"{value:.3f}".rstrip("0").rstrip(".")
 
 
+def page_enable(start: float, end: float, last_page: bool) -> str:
+    """ffmpeg `enable` expression for a comment page. Half-open [start, end), so two pages
+    never show on the same frame; the last page stays up to the end."""
+    if last_page:
+        return f"gte(t,{_num(start)})"
+    return f"gte(t,{_num(start)})*lt(t,{_num(end)})"
+
+
 def render_segment(plan: OverlayPlan, clip: Optional[Path], out: Path, cfg: Config,
                    offset: float = 0.0) -> Path:
     """Render one clip with its overlay to `out` (written atomically)."""
@@ -98,8 +106,8 @@ def render_segment(plan: OverlayPlan, clip: Optional[Path], out: Path, cfg: Conf
     last = "v1"
     for k, (idx, (_, start, end)) in enumerate(zip(page_idx, plan.pages)):
         nxt = f"p{k}"
-        graph.append(f"[{last}][{idx}:v]overlay=0:0:format=auto:"
-                     f"enable='between(t,{_num(start)},{_num(end)})'[{nxt}]")
+        enable = page_enable(start, end, last_page=k == len(plan.pages) - 1)
+        graph.append(f"[{last}][{idx}:v]overlay=0:0:format=auto:enable='{enable}'[{nxt}]")
         last = nxt
     graph.append(f"[{last}]format=yuv420p[outv]")
 
