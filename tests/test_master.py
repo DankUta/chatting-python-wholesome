@@ -101,12 +101,15 @@ def test_roundtrip(tmp_path):
 
 
 def test_backup_on_overwrite(tmp_path):
+    from chatting.master import BACKUPS_KEPT
+
     res, _ = compile_()
     path = tmp_path / "master.xlsx"
     write_master(res, path)
-    assert not (tmp_path / "master.backup.xlsx").exists()
-    write_master(res, path)
-    assert (tmp_path / "master.backup.xlsx").exists()
+    assert not list(tmp_path.glob("master.backup-*.xlsx"))
+    for _ in range(BACKUPS_KEPT + 2):
+        write_master(res, path)
+    assert len(list(tmp_path.glob("master.backup-*.xlsx"))) == BACKUPS_KEPT
 
 
 def edit(path, fn):

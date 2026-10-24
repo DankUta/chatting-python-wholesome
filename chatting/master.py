@@ -93,6 +93,24 @@ def compile_results(
 # --- writing ---------------------------------------------------------------------------
 
 
+BACKUPS_KEPT = 10
+
+
+def _backup(path: Path) -> None:
+    """Copy the current master (maybe hand-edited) aside before it's rebuilt; keep the last few."""
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    target = path.with_name(f"{path.stem}.backup-{stamp}{path.suffix}")
+    n = 2
+    while target.exists():
+        target = path.with_name(f"{path.stem}.backup-{stamp}-{n}{path.suffix}")
+        n += 1
+    shutil.copy(path, target)
+    backups = sorted(path.parent.glob(f"{path.stem}.backup-*{path.suffix}"),
+                     key=lambda p: (p.stat().st_mtime, p.name))
+    for stale in backups[:-BACKUPS_KEPT]:
+        stale.unlink()
+
+
 def write_master(results: Results, path: Path, title: str = "") -> None:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -101,7 +119,7 @@ def write_master(results: Results, path: Path, title: str = "") -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
-        shutil.copy2(path, path.with_name(path.stem + ".backup.xlsx"))
+        _backup(path)
 
     bold = Font(bold=True)
     green = PatternFill("solid", start_color="C6EFCE")

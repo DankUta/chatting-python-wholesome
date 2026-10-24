@@ -133,8 +133,8 @@ python -m chatting compile
 Fix whatever you want **in the master sheet** (a typo, a rating, a start time, the order
 of the voter columns = the order on screen). The video is made from the master sheet and
 the averages and ranks are recalculated from it, so your edits count. Running `compile`
-again rebuilds it from the rating sheets (the previous one is kept as
-`master.backup.xlsx`).
+again rebuilds it from the rating sheets; the previous one is kept as
+`master.backup-<date>-<time>.xlsx` (the last 10 are kept), so hand edits are never lost.
 
 Tied averages share a rank.
 
