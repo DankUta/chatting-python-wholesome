@@ -141,7 +141,7 @@ class FontSet:
         faces = self._faces(bold)
         runs: list = []
         dropped_prev = False
-        for ch in line:
+        for i, ch in enumerate(line):
             code = ord(ch)
             if ch == "\t":
                 ch, code = " ", 32
@@ -152,7 +152,12 @@ class FontSet:
                 continue
             if code in STICKY:
                 continue
-            face = next((f for f in faces if f.covers(code)), None)
+            candidates = faces
+            emoji = self._emoji
+            if emoji is not None and (code >= 0x1F000 or line[i + 1:i + 2] == "\uFE0F") \
+                    and emoji.covers(code):
+                candidates = [emoji]   # emoji presentation: use the color face, not a mono glyph
+            face = next((f for f in candidates if f.covers(code)), None)
             if face is None:
                 dropped_prev = True
                 if ch not in self._warned and ch.isprintable():

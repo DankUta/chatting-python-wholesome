@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageChops
 
 from chatting.config import FontsConfig
 from chatting.text import FontError, FontSet
@@ -54,6 +54,34 @@ def test_emoji_draws_pixels(fonts):
     emoji_area = img.crop((text_w + 2, 0, 400, 80))
     assert emoji_area.getchannel("A").getbbox() is not None
     assert fonts.measure("lol 💀😂", 40)[0] > text_w + 40
+
+
+def _run_faces(fonts, text):
+    return [(r.face, r.text) for r in fonts._split(text, False)]
+
+
+def test_emoji_presentation_prefers_emoji_face(fonts):
+    if not fonts.has_emoji:
+        pytest.skip("no emoji font installed")
+    for text in ("\u2764\uFE0F", "\U0001F600"):
+        runs = _run_faces(fonts, text)
+        assert len(runs) == 1 and runs[0][0] is fonts._emoji and runs[0][1] == text
+    for text in ("A", "\u2665"):
+        runs = _run_faces(fonts, text)
+        assert all(face is fonts._regular for face, _ in runs)
+
+
+def test_dejavu_covered_emoji_are_colored(fonts):
+    if not fonts.has_emoji:
+        pytest.skip("no emoji font installed")
+    text = "I \u2764\uFE0F this \U0001F600"
+    start = fonts.measure("I ", 40)[0]
+    img = Image.new("RGBA", (500, 80), (0, 0, 0, 0))
+    fonts.draw(img, (0, 0), text, 40, (255, 255, 255, 255))
+    area = img.crop((start, 0, 500, 80))
+    r, g, b, _ = area.split()
+    spread = ImageChops.difference(r, b).histogram()
+    assert sum(spread[41:]) > 20   # clearly non-grey pixels
 
 
 def test_unknown_characters_do_not_crash_and_warn_once():
