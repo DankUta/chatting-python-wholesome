@@ -239,3 +239,21 @@ def test_name_question_with_a_digit_is_not_a_song_column():
     assert cm.name == "Name (2 words max)"
     assert cm.titles == {1: "Song 1 title", 2: "Song 2 title", 3: "Track 3 name"}
     assert cm.links == {1: "Song 1 link", 2: "Song 2 link", 3: "Song 3 link"}
+
+
+def test_registry_saved_by_excel(tmp_path):
+    path = tmp_path / "songs.csv"
+    # Semicolons, cp1250 (Romanian Excel), start times as h:mm:ss.
+    path.write_bytes("id;title;artist;link;submitter;slot;start\n"
+                     "2;Doi;Ş;https://youtu.be/b;Ştefan;1;0:43:00\n"
+                     "1;Unu;A;https://youtu.be/a;Ana;2;1:05\n".encode("cp1250"))
+    songs = read_registry(path)
+    assert [(s.id, s.start) for s in songs] == [(1, 65), (2, 43)]
+    assert songs[1].submitter == "Ştefan"
+
+
+def test_registry_without_id_column(tmp_path):
+    path = tmp_path / "songs.csv"
+    path.write_text("title,artist\nx,y\n", encoding="utf-8")
+    with pytest.raises(SubmissionError):
+        read_registry(path)

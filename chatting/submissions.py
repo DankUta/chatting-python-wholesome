@@ -16,7 +16,7 @@ from .config import ColumnsConfig, Config
 from .links import is_url, youtube_id, youtube_start_param
 from .models import Song, SongEntry, Submission
 from .names import People, normalize
-from .sources import read_table
+from .sources import SourceError, read_table
 from .timestamps import format_time, parse_time, parse_timestamps_field
 
 SLOTS = 5
@@ -321,14 +321,41 @@ def write_registry(songs: list[Song], path: Path) -> None:
 
 
 def read_registry(path: Path) -> list[Song]:
+    """Read songs.csv back, also after someone opened and saved it in Excel (other
+    delimiter or encoding, start times turned into h:mm:ss)."""
+    try:
+        df = read_table(str(path), Path(path).parent)
+    except SourceError as exc:
+        raise SubmissionError(f"Can't read the song list {path}: {exc}") from exc
+    cols = {str(c).strip().casefold(): c for c in df.columns}
+    if "id" not in cols:
+        raise SubmissionError(
+            f"The song list {path} has no 'id' column. If it was edited, restore it from the "
+            f"columns {', '.join(_REG_COLUMNS)} — or delete it to renumber (only before the "
+            "rating sheets go out)."
+        )
+
+    def cell(row, name: str) -> str:
+        col = cols.get(name)
+        return "" if col is None else str(row[col]).strip()
+
     songs = []
-    with Path(path).open("r", encoding="utf-8-sig", newline="") as fh:
-        for row in csv.DictReader(fh):
-            songs.append(Song(
-                id=int(row["id"]), title=row.get("title", ""), artist=row.get("artist", ""),
-                link=row.get("link", ""), submitter=row.get("submitter", ""),
-                slot=int(row.get("slot") or 0), start=parse_time(row.get("start", "")),
-            ))
+    for _, row in df.iterrows():
+        sid = cell(row, "id")
+        if not sid:
+            continue
+        try:
+            song_id = int(float(sid))
+            slot = int(float(cell(row, "slot") or 0))
+        except ValueError as exc:
+            raise SubmissionError(f"The song list {path} has an unreadable row: id '{sid}'") from exc
+        start = cell(row, "start")
+        excel = re.fullmatch(r"(\d{1,2}):(\d{2}):00", start)
+        if excel:   # Excel turned "1:23" into 1:23:00 (h:mm:ss); clips don't start an hour in
+            start = f"{excel.group(1)}:{excel.group(2)}"
+        songs.append(Song(id=song_id, title=cell(row, "title"), artist=cell(row, "artist"),
+                          link=cell(row, "link"), submitter=cell(row, "submitter"), slot=slot,
+                          start=parse_time(start)))
     return sorted(songs, key=lambda s: s.id)
 
 
