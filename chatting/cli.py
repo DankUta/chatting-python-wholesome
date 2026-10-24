@@ -11,6 +11,10 @@ from . import __version__, log
 from .config import DEFAULT_CONFIG_NAME, Config, ConfigError, load_config
 from .names import People
 
+class CliError(Exception):
+    pass
+
+
 TEMPLATE = '''# Chatting — settings for one edition. Every key is optional; delete what you don't need.
 # Relative paths are relative to this file's folder.
 
@@ -185,7 +189,11 @@ def _compile(cfg: Config):
     submissions, songs = _load_songs(cfg, people)
     voters, votes = load_votes(cfg, songs, people)
     if not voters:
-        log.warn(f"No rating sheets found in {cfg.path(cfg.input.ratings_dir)}")
+        raise CliError(
+            "No ratings to compile. Put each voter's filled-in sheet in "
+            f"{cfg.path(cfg.input.ratings_dir)} (named after the voter, e.g. bianca.xlsx), "
+            "or list their links under [input.rating_links] in chatting.toml."
+        )
     results = compile_results(songs, voters, votes, people, cfg.voting)
     master = _master_path(cfg)
     write_master(results, master, title=cfg.contest.title)

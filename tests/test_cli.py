@@ -150,3 +150,10 @@ def test_preview_and_render(edition):
     v = next(s for s in info["streams"] if s["codec_type"] == "video")
     assert (v["width"], v["height"], v["pix_fmt"]) == (1920, 1080, "yuv420p")
     assert any(s["codec_type"] == "audio" for s in info["streams"])
+
+
+def test_compile_without_ratings_stops_with_a_clear_error(edition, capsys):
+    assert run(edition, "sheet") == 0
+    assert run(edition, "compile") == 1
+    assert "No ratings to compile" in capsys.readouterr().err
+    assert not (edition / "output" / "master.xlsx").exists()
