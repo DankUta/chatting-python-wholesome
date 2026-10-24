@@ -86,8 +86,9 @@ This writes to `output/`:
 | `rating_sheet.xlsx` / `.csv` | The anonymous sheet: `#`, `Song`, `Link`, `Rating`, `Comments`, songs in shuffled order. Upload it to Google Drive and give everyone their own copy (tip: a link ending in `/copy` instead of `/edit` makes Google ask "Make a copy?"). |
 | `songs.csv` | **Private** — which song is whose. It pins the song numbers, so keep it until the video is done. |
 
-It also lists songs without a timestamp; those start at `default_start` (0:30) unless you
-fix them later in the master sheet.
+It also prints every song's clip start next to what each person wrote in the timestamps
+field, so a misread is easy to spot. Songs without one start at `default_start` (0:30)
+unless you fix them later in the master sheet.
 
 The timestamps field understands most ways people write it: `1: 0:45, 2: 1:20`,
 `1. 0:45` on separate lines, `song 1 - 1:15`, `1) 1:05`, `1: 45s`, `1: 1m20s`, a plain list

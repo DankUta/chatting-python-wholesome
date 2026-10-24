@@ -152,6 +152,7 @@ def cmd_check(cfg: Config, args: argparse.Namespace) -> int:
 def cmd_sheet(cfg: Config, args: argparse.Namespace) -> int:
     from .ratings import write_rating_sheet
     from .submissions import write_registry
+    from .timestamps import format_time
 
     people = _people(cfg)
     registry = _registry_path(cfg)
@@ -168,11 +169,16 @@ def cmd_sheet(cfg: Config, args: argparse.Namespace) -> int:
     write_registry(songs, registry)
 
     log.info(f"{len(submissions)} participants, {len(songs)} songs.")
-    no_start = [s for s in songs if s.start is None]
-    if no_start:
-        log.info(f"No timestamp for {len(no_start)} song(s), they'll start at {cfg.video.default_start}:")
-        for s in no_start:
-            log.info(f"    #{s.id} {s.label} ({s.submitter})")
+    log.info(f"Clip starts per song (– = none given, starts at {cfg.video.default_start}); "
+             "check them against what people wrote:")
+    width = max(len(sub.name) for sub in submissions)
+    for sub in submissions:
+        own = sorted((s for s in songs if people.same(s.submitter, sub.name)), key=lambda s: s.slot)
+        starts = "  ".join(f"{s.slot}) {format_time(s.start) or '–':>5}" for s in own)
+        written = " ".join(sub.timestamps_raw.split())
+        if len(written) > 60:
+            written = written[:59] + "…"
+        log.info(f"  {sub.name:<{width}}  {starts}    \"{written}\"")
     log.info(f"Rating sheet:  {sheet}  (+ .csv) — upload it to Google Drive and share a copy with everyone.")
     log.info(f"Song list:     {registry}  — private (it shows who sent what); keep it until the video is done.")
     return 0
