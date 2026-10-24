@@ -59,7 +59,14 @@ def _has(pattern: str, text: str) -> bool:
     return re.search(pattern, text, re.I) is not None
 
 
+_ORDINALS = {"first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3,
+             "fourth": 4, "4th": 4, "fifth": 5, "5th": 5}
+
+
 def _slot_of(header: str) -> Optional[int]:
+    m = re.search(r"\b(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\b", header, re.I)
+    if m:
+        return _ORDINALS[m.group(1).lower()]
     m = re.search(r"(?<![\d.])([1-9])(?![\d])", header)
     return int(m.group(1)) if m and int(m.group(1)) <= SLOTS else None
 

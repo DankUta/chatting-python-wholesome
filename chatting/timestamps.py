@@ -48,52 +48,40 @@ def format_time(seconds: Optional[float]) -> str:
 _TIME = (
     r"(?:\d{1,2}:\d{2}:\d{2}|\d{1,2}:\d{2}(?:\.\d+)?"
     r"|\d+\s*h\s*\d+\s*m(?:\s*\d+\s*s?)?|\d+\s*m(?:in)?\s*\d*\s*s?"
-    r"|\d+(?:\.\d+)?\s*s(?:ec)?\b|\d{1,2}[.,]\d{2}\b)"
+    r"|\d+(?:\.\d+)?\s*s(?:ec(?:ond)?s?)?\b|\d{1,2}[.,]\d{2}\b)"
 )
+# "1: 0:45", "1. 0:45", "1) 0:45", "song 1 - 0:45", "#1 0:45", "1:0:45" — anywhere in the text,
+# so entries on one line without commas ("1) 1:05 2) 0:30") are found too.
+_NUMBERED = re.compile(
+    r"(?<![\d:.])(?:song\s*|#\s*)?([1-9])\s*(?:[:.)=\-–—]|\s)\s*(" + _TIME + r")(?!\d)", re.I
+)
+_PLAIN = re.compile(r"(?<![\d:.])(" + _TIME + r")(?!\d)", re.I)
+_RANGE_GAP = re.compile(r"\s*(?:[-–—~]|to|until|pana la|până la)\s*", re.I)
+
+
 def parse_timestamps_field(text: object, slots: int = 5) -> dict[int, float]:
     """Parse the free-text timestamps field into {slot: seconds}."""
     raw = str(text if text is not None else "")
     if not raw.strip() or raw.strip().lower() == "nan":
         return {}
     found: dict[int, float] = {}
-    for line in re.split(r"[\n;]+", raw):
-        _numbered_in_line(line, slots, found)
+    for m in _NUMBERED.finditer(raw):
+        slot = int(m.group(1))
+        t = parse_time(m.group(2).strip())
+        if t is not None and slot <= slots and slot not in found:
+            found[slot] = t
     if found:
         return found
-    # No numbered entries: unnumbered times in order.
-    times = []
-    for line in re.split(r"[\n;,]+", raw):
-        line = line.strip()
-        if not line:
+    # No numbered entries: unnumbered times in song order; the end of a range is skipped.
+    times: list[float] = []
+    prev_end = None
+    for m in _PLAIN.finditer(raw):
+        is_range_end = prev_end is not None and _RANGE_GAP.fullmatch(raw[prev_end:m.start()])
+        prev_end = m.end()
+        if is_range_end:
+            prev_end = None
             continue
-        t = parse_time(re.split(r"\s*[-–—]\s*", line)[0])
-        if t is None:
-            m = re.search(_TIME, line, re.I)
-            t = parse_time(m.group(0)) if m else None
+        t = parse_time(m.group(1).strip())
         if t is not None:
             times.append(t)
     return {i + 1: t for i, t in enumerate(times) if i < slots}
-
-
-def _numbered_in_line(line: str, slots: int, found: dict[int, float]) -> None:
-    # Split a line on commas that start a new numbered entry ("1: 0:45, 2: 1:20").
-    pieces = re.split(r",\s*(?=(?:song\s*|#\s*)?[1-9]\s*[:.)=\-–—\s])", line, flags=re.I)
-    for piece in pieces:
-        m = re.match(r"\s*(?:song\s*|#\s*)?([1-9])\s*[:.)=\-–—]?\s*(.*)$", piece, re.I | re.S)
-        if not m:
-            continue
-        slot, rest = int(m.group(1)), m.group(2).strip()
-        has_sep = bool(re.match(r"\s*(?:song\s*|#\s*)?[1-9]\s*[:.)=\-–—\s]", piece, re.I))
-        if not has_sep or slot > slots or slot in found or not rest:
-            continue
-        t = _leading_time(rest)
-        if t is not None:
-            found[slot] = t
-
-
-def _leading_time(rest: str) -> Optional[float]:
-    # "1:0:45" -> rest "0:45"; ranges "0:45-1:00" -> start.
-    m = re.match(r"(" + _TIME + r")", rest, re.I)
-    if not m:
-        return None
-    return parse_time(m.group(1).strip())

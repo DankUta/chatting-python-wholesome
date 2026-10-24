@@ -186,3 +186,20 @@ def test_registry_roundtrip_and_merge(tmp_path):
     assert merged[3].submitter == "Dee"
     text = "\n".join(warnings)
     assert "link changed" in text and "added after" in text and "no longer" in text
+
+
+def test_ordinal_song_headers():
+    from chatting.config import ColumnsConfig
+    from chatting.submissions import detect_columns
+
+    headers = ["Timestamp", "Name", "First song title", "First song link", "Second song title",
+               "Second song link", "5th song link"]
+    cm = detect_columns(headers, ColumnsConfig())
+    assert cm.titles == {1: "First song title", 2: "Second song title"}
+    assert cm.links == {1: "First song link", 2: "Second song link", 5: "5th song link"}
+
+
+def test_label_falls_back_to_link():
+    from chatting.models import Song
+
+    assert Song(1, "", "", "https://youtu.be/x", "A").label == "https://youtu.be/x"

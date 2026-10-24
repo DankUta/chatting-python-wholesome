@@ -44,10 +44,10 @@ class Song:
 
     @property
     def label(self) -> str:
-        """How the song is written on the rating sheet: "Artist - Title"."""
+        """How the song is written on the rating sheet: "Artist - Title" (the link if both are blank)."""
         if self.artist and self.title:
             return f"{self.artist} - {self.title}"
-        return self.title or self.artist
+        return self.title or self.artist or self.link
 
 
 @dataclass
