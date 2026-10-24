@@ -203,3 +203,28 @@ def test_label_falls_back_to_link():
     from chatting.models import Song
 
     assert Song(1, "", "", "https://youtu.be/x", "A").label == "https://youtu.be/x"
+
+
+def test_registry_follows_the_song_not_the_form_slot():
+    people = People()
+    reg = [
+        Song(1, "A", "X", "https://youtu.be/aaaaaaaaaaa", "Ana", 1, 10),
+        Song(2, "B", "X", "https://youtu.be/bbbbbbbbbbb", "Ana", 2, 20),
+    ]
+    # Ana swapped her two songs in the form.
+    swapped = [
+        Song(1, "B", "X", "https://youtu.be/bbbbbbbbbbb", "Ana", 1, 20),
+        Song(2, "A", "X", "https://youtu.be/aaaaaaaaaaa", "Ana", 2, 10),
+    ]
+    merged = merge_registry(reg, swapped, people, lambda m: None)
+    assert [(s.id, s.title, s.slot) for s in merged] == [(1, "A", 2), (2, "B", 1)]
+
+    # Ana replaced song A with C: C must not inherit A's number (and its ratings).
+    replaced = [
+        Song(1, "C", "Y", "https://youtu.be/ccccccccccc", "Ana", 1, 5),
+        Song(2, "B", "X", "https://youtu.be/bbbbbbbbbbb", "Ana", 2, 20),
+    ]
+    warnings = []
+    merged = merge_registry(reg, replaced, people, warnings.append)
+    assert [(s.id, s.title) for s in merged] == [(1, "A"), (2, "B"), (3, "C")]
+    assert any("no longer in the responses" in w for w in warnings)

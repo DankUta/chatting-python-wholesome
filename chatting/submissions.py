@@ -328,30 +328,54 @@ def read_registry(path: Path) -> list[Song]:
     return sorted(songs, key=lambda s: s.id)
 
 
+def _link_key(song: Song) -> str:
+    yid = youtube_id(song.link)
+    return f"yt:{yid}" if yid else normalize(song.link)
+
+
+def _title_key(song: Song) -> str:
+    key = normalize(song.artist) + "|" + normalize(song.title)
+    return "" if key == "|" else key
+
+
 def merge_registry(
     registry: list[Song], fresh: list[Song], people: People, warn: Callable[[str], None] = log.warn
 ) -> list[Song]:
-    fresh_by = {(people.key(s.submitter), s.slot): s for s in fresh}
+    """Keep every song's number from the registry; ratings were given to those numbers.
+
+    A song is recognised by its submitter plus its link (then its artist + title), never by
+    its position in the form — so reordering songs keeps their numbers, and a replaced song
+    gets a new number instead of inheriting the old song's ratings.
+    """
+    remaining = list(fresh)
+    pairs: dict[int, Song] = {}
+    for key_fn in (_link_key, _title_key):
+        for old in registry:
+            key = key_fn(old)
+            if old.id in pairs or not key:
+                continue
+            for new in remaining:
+                if people.key(new.submitter) == people.key(old.submitter) and key_fn(new) == key:
+                    pairs[old.id] = new
+                    remaining.remove(new)
+                    break
+
     merged: list[Song] = []
-    used: set[tuple[str, int]] = set()
     for old in registry:
-        k = (people.key(old.submitter), old.slot)
-        new = fresh_by.get(k)
+        new = pairs.get(old.id)
         if new is None:
-            warn(f"Song {old.id} ({old.label}, by {old.submitter}) is in the registry but no longer in the responses; keeping it.")
+            warn(f"Song {old.id} ({old.label}, by {old.submitter}) is no longer in the responses; "
+                 "keeping it, since the rating sheets have it.")
             merged.append(old)
             continue
-        used.add(k)
         if new.link != old.link:
             warn(f"Song {old.id} ({new.label}): the link changed since the rating sheets went out.")
         merged.append(Song(id=old.id, title=new.title, artist=new.artist, link=new.link,
-                           submitter=old.submitter, slot=old.slot, start=new.start))
+                           submitter=old.submitter, slot=new.slot, start=new.start))
     next_id = max((s.id for s in registry), default=0) + 1
-    for s in fresh:
-        k = (people.key(s.submitter), s.slot)
-        if k in used:
-            continue
-        warn(f"Song '{s.label}' by {s.submitter} was added after the rating sheets went out; it gets number {next_id}.")
+    for s in remaining:
+        warn(f"Song '{s.label}' by {s.submitter} was added after the rating sheets went out; "
+             f"it gets number {next_id} and has no ratings unless voters add it.")
         merged.append(Song(id=next_id, title=s.title, artist=s.artist, link=s.link,
                            submitter=s.submitter, slot=s.slot, start=s.start))
         next_id += 1
