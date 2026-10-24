@@ -83,7 +83,7 @@ def test_gives_up_with_hint(tmp_path):
         Downloader(cfg, runner=runner, sleep=sleeps.append).get(song, 1.0, 15.0)
     assert len(runner.calls) == 3 and sleeps == [5, 15]
     text = str(exc.value)
-    assert "ERROR: boom" in text and "pip install -U yt-dlp" in text and "7.mp4" in text
+    assert "ERROR: boom" in text and 'pip install -U "yt-dlp[default]"' in text and "7.mp4" in text
 
 
 def test_local_clip(tmp_path):
@@ -107,3 +107,24 @@ def test_find_tool_uses_config(tmp_path):
     cfg.video.ffmpeg = str(tmp_path / "ffmpeg")
     assert find_tool("ffmpeg", cfg) == str(tmp_path / "ffmpeg")
     assert find_tool("ffprobe", cfg) == str(tmp_path / "ffprobe")
+
+
+def test_js_runtime_falls_back_to_node_or_bun(tmp_path, monkeypatch):
+    from chatting.clips import js_runtime_args, youtube_advice
+
+    cfg = Config(base_dir=tmp_path)
+    found = {}
+    monkeypatch.setattr("chatting.clips.shutil.which", lambda name: found.get(name))
+    assert js_runtime_args(cfg) == []
+    assert any("Deno" in a for a in youtube_advice(cfg))
+
+    found["node"] = "/usr/bin/node"
+    assert js_runtime_args(cfg) == ["--js-runtimes", "node"]
+    assert not any("Deno" in a for a in youtube_advice(cfg))
+
+    found["deno"] = "/usr/bin/deno"
+    assert js_runtime_args(cfg) == []          # yt-dlp finds Deno by itself
+
+    del found["deno"]
+    cfg.video.yt_dlp_args = ["--js-runtimes", "quickjs"]
+    assert js_runtime_args(cfg) == []          # the user's own choice wins

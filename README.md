@@ -35,7 +35,13 @@ What the video shows for every song, from last place to #1:
      and `ffprobe.exe` in this folder
    * macOS: `brew install ffmpeg`
    * Linux: `sudo apt install ffmpeg`
-3. **Python packages** — from this folder:
+3. **Deno** — yt-dlp needs a JavaScript runtime to download from YouTube
+   * Windows: `winget install DenoLand.Deno`
+   * macOS: `brew install deno`
+   * Linux: `curl -fsSL https://deno.land/install.sh | sh`
+
+   (If you already have Node.js or Bun, that works too; it's picked up automatically.)
+4. **Python packages** — from this folder:
    ```bash
    pip install -r requirements.txt
    ```
@@ -155,7 +161,8 @@ done.
 
 If a song's video won't download:
 
-1. update yt-dlp: `pip install -U yt-dlp`
+1. update yt-dlp: `pip install -U "yt-dlp[default]"`, and check `python -m chatting check` finds
+   a JavaScript runtime (Deno)
 2. if YouTube asks to sign in, add `yt_dlp_args = ["--cookies-from-browser", "firefox"]`
    (or `"chrome"`, `"edge"`) under `[video]`
 3. or download the video yourself and save it as `data/clips/<song #>.mp4` (the `#` from

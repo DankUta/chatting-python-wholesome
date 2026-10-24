@@ -133,7 +133,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 def cmd_check(cfg: Config, args: argparse.Namespace) -> int:
-    from .clips import check_tools
+    from .clips import check_tools, youtube_advice
     from .text import FontSet
 
     log.info(f"Config folder: {cfg.base_dir}")
@@ -144,6 +144,8 @@ def cmd_check(cfg: Config, args: argparse.Namespace) -> int:
         log.warn(problem)
     if not problems:
         log.info("ffmpeg, ffprobe and yt-dlp found.")
+    for advice in youtube_advice(cfg):
+        log.warn(advice)
     return 1 if problems else 0
 
 
@@ -286,7 +288,7 @@ def cmd_preview(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_render(cfg: Config, args: argparse.Namespace) -> int:
-    from .clips import check_tools
+    from .clips import check_tools, youtube_advice
     from .render import render_video
 
     problems = check_tools(cfg)
@@ -295,6 +297,9 @@ def cmd_render(cfg: Config, args: argparse.Namespace) -> int:
             log.warn(problem)
         if any("ffmpeg" in p.lower() for p in problems) or (not args.no_download and problems):
             return 1
+    if not args.no_download:
+        for advice in youtube_advice(cfg):
+            log.warn(advice)
     submissions, results = _results_for_video(cfg)
     avatars = _avatars(cfg, submissions, results, offline=args.offline)
     video = render_video(results, cfg, avatars, ranks=parse_ranks(args.ranks),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -65,6 +66,36 @@ def check_tools(cfg: Config) -> list:
         problems.append(f"yt-dlp is not installed for this Python. Install it with: "
                         f"{sys.executable} -m pip install yt-dlp")
     return problems
+
+
+def js_runtime_args(cfg: Config) -> list:
+    """yt-dlp needs a JavaScript runtime for YouTube and only looks for Deno by itself;
+    point it at Node or Bun when Deno isn't installed but one of those is."""
+    if any(arg.startswith("--js-runtimes") or arg == "--no-js-runtimes"
+           for arg in cfg.video.yt_dlp_args):
+        return []
+    if shutil.which("deno"):
+        return []
+    for name in ("node", "bun"):
+        if shutil.which(name):
+            return ["--js-runtimes", name]
+    return []
+
+
+def youtube_advice(cfg: Config) -> list:
+    """Things that don't stop a render but make YouTube downloads fail or come out worse."""
+    advice = []
+    if not shutil.which("deno") and not js_runtime_args(cfg) and not any(
+            arg.startswith("--js-runtimes") for arg in cfg.video.yt_dlp_args):
+        advice.append(
+            "No JavaScript runtime found: YouTube downloads may fail or get low quality. "
+            "Install Deno: winget install DenoLand.Deno (Windows), brew install deno (macOS) "
+            "or curl -fsSL https://deno.land/install.sh | sh (Linux).")
+    if importlib.util.find_spec("yt_dlp_ejs") is None:
+        advice.append(
+            "yt-dlp's YouTube helper scripts are missing. Install them with: "
+            f'{sys.executable} -m pip install -U "yt-dlp[default]"')
+    return advice
 
 
 def probe(path: Path, cfg: Config) -> dict:
@@ -132,7 +163,7 @@ class Downloader:
             "--download-sections", f"*{start}-{start + duration + 1}",
             "--force-keyframes-at-cuts",
             "-o", f"{folder}/{key}.%(ext)s",
-            *video.yt_dlp_args, song.link,
+            *js_runtime_args(self.cfg), *video.yt_dlp_args, song.link,
         ]
 
     def get(self, song: Song, start: float, duration: float) -> Path:
@@ -162,6 +193,6 @@ class Downloader:
         tail = "\n".join(error.splitlines()[-STDERR_LINES:])
         raise ClipError(
             f"Couldn't download {song.link}:\n{tail}\n"
-            f"Try: update yt-dlp (pip install -U yt-dlp); or set yt_dlp_args = "
+            f"Try: update yt-dlp (pip install -U \"yt-dlp[default]\"); or set yt_dlp_args = "
             f"[\"--cookies-from-browser\", \"firefox\"] in [video]; or put the video in "
             f"{self.cfg.input.clips_dir} as {song.id}.mp4")
