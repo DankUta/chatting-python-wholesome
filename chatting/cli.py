@@ -214,9 +214,16 @@ def cmd_compile(cfg: Config, args: argparse.Namespace) -> int:
 
     voter_keys = {people.key(v) for v in results.voters}
     missing = sorted({s.name for s in submissions if people.key(s.name) not in voter_keys})
+    no_songs = [v for v in results.voters if not any(people.same(v, s.name) for s in submissions)]
     log.info(f"{len(results.voters)} voters: {', '.join(results.voters)}")
     if missing:
         log.warn(f"No rating sheet from: {', '.join(missing)}")
+    if no_songs:
+        log.warn(
+            f"Rated but didn't submit songs under that name: {', '.join(no_songs)}. If one of them "
+            "did submit (spelled differently), add the spelling under [people] in chatting.toml, "
+            "otherwise their rating of their own songs counts."
+        )
 
     log.info("")
     show = results.songs if args.all else results.songs[:5]

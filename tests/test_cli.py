@@ -157,3 +157,11 @@ def test_compile_without_ratings_stops_with_a_clear_error(edition, capsys):
     assert run(edition, "compile") == 1
     assert "No ratings to compile" in capsys.readouterr().err
     assert not (edition / "output" / "master.xlsx").exists()
+
+
+def test_compile_flags_voters_without_songs(edition, capsys):
+    assert run(edition, "sheet") == 0
+    fill_ratings(edition, ["Andrei", "Calin M", "Gabi"])
+    assert run(edition, "compile") == 0
+    err = capsys.readouterr().err
+    assert "Rated but didn't submit songs under that name: Calin M, Gabi" in err

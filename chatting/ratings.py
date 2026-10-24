@@ -21,6 +21,8 @@ _MISSING = {"", "-", "–", "—", "x", "n/a", "na", "forgot", "skip", "?", "nan
 _RATING_HEADER = r"rating|grade|score|nota|notă|punctaj|rate|^note?$"
 _SONG_OR_ID_HEADER = r"song|title|track|piesa|piesă|melodie|^#$|^id$|^nr?\.?$"
 _SHEET_SUFFIXES = {".csv", ".tsv", ".xlsx", ".xlsm", ".ods"}
+# File names that are still the download's default instead of the voter's name.
+_GENERIC_NAME = re.compile(r"copy of|copie|rating.?sheet|untitled|spreadsheet|foaie de calcul|chatting", re.I)
 
 
 def _fmt(x: float) -> str:
@@ -245,6 +247,9 @@ def load_votes(
                 continue
             if p.stem.strip().lower().replace("_", " ") == "rating sheet":
                 continue
+            if _GENERIC_NAME.search(p.stem):
+                warn(f"'{p.name}' doesn't look like a voter's name; rename it after the voter "
+                     "(e.g. bianca.xlsx) so their own songs are recognised.")
             by_voter.setdefault(people.key(voter_name_from_path(p)), []).append(p)
         for files in by_voter.values():
             # A re-sent sheet is usually saved as "name (1).xlsx": the newest file wins.

@@ -176,3 +176,14 @@ def test_rating_with_a_second_number_is_reported(raw):
                                           ("8. solid", 8), ("10!", 10)])
 def test_rating_with_harmless_extras(raw, expected):
     assert parse_rating_value(raw) == (expected, None)
+
+
+def test_generic_file_name_is_flagged(tmp_path):
+    cfg = Config(base_dir=tmp_path)
+    folder = tmp_path / "data" / "ratings"
+    folder.mkdir(parents=True)
+    (folder / "Copy of Chatting ratings.csv").write_text(
+        "#,Song,Rating,Comments\n1,Adele - Hello,5,\n", encoding="utf-8")
+    warnings = []
+    load_votes(cfg, SONGS, People(), warnings.append)
+    assert any("doesn't look like a voter's name" in w for w in warnings)
