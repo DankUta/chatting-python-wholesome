@@ -159,7 +159,8 @@ If a song's video won't download:
 2. if YouTube asks to sign in, add `yt_dlp_args = ["--cookies-from-browser", "firefox"]`
    (or `"chrome"`, `"edge"`) under `[video]`
 3. or download the video yourself and save it as `data/clips/<song #>.mp4` (the `#` from
-   the rating sheet); it's used instead, cut at the song's start time
+   the rating sheet); it's used instead, cut at the song's start time — or from the
+   beginning if the file is too short for that, so an already-cut 15 s clip works too
 
 Songs whose clip couldn't be found still get their screen (with a black box) and are listed
 at the end, so the countdown is never missing a place.
