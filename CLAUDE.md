@@ -1,8 +1,30 @@
 # chatting-python-wholesome
 
-A Python pipeline (`chatting.py`) that renders a 1080p countdown video from Google
-Sheet rankings, using `yt-dlp` for clips and `ffmpeg` for cutting, overlaying and
-concatenating.
+The admin side of "Chatting", a friends' song contest: Google Form submissions → an
+anonymous rating sheet → a master spreadsheet of everyone's ratings → a 1080p countdown
+video. A Python package run as `python -m chatting <command>`; `yt-dlp` fetches the
+clips and `ffmpeg` renders them. README.md is the user guide.
+
+## Layout
+
+| Path | What |
+| --- | --- |
+| `chatting/cli.py` | Commands: `init`, `check`, `sheet`, `compile`, `preview`, `render` |
+| `chatting/config.py`, `models.py`, `names.py`, `log.py` | Settings (`chatting.toml`), shared dataclasses, name matching across spellings, console output |
+| `chatting/sources.py`, `submissions.py`, `timestamps.py`, `links.py` | Reading sheets (local or Google links), the form responses, clip start times |
+| `chatting/ratings.py`, `master.py` | The rating sheet (write + read back), averages/ranks and the master workbook |
+| `chatting/text.py`, `avatars.py`, `overlay.py` | On-screen graphics: font/emoji fallback, profile pictures, per-song overlays |
+| `chatting/clips.py`, `render.py` | yt-dlp downloads (cached, rate-limited) and ffmpeg segments + concat |
+| `examples/demo/` | A made-up edition with filled-in rating sheets, for trying the commands |
+
+Contest rules baked in: a voter's rating of their own song never counts; tied averages
+share a rank; every comment is shown (paginated over the clip when they don't fit).
+
+## Checks
+
+- Tests: `python -m pytest` (~2 min; the ffmpeg ones are marked `slow`, skip them with
+  `-m "not slow"`). No test touches the network.
+- Keep Python 3.9 compatible (`from __future__ import annotations`, no `match`).
 
 ## Agents and routing
 
@@ -37,3 +59,5 @@ Routing rules:
 
 - Commits and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/):
   `type(scope): summary`, e.g. `feat(render): ...`, `fix(download): ...`.
+- Micro commits: one logical change per commit (a module, or a fix with its test), not
+  one big commit at the end.
