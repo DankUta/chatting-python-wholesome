@@ -181,3 +181,32 @@ def test_start_times_retyped_in_excel(tmp_path):
 
     starts = {r.song.id: r.song.start for r in read_master(path, People(), VotingConfig()).songs}
     assert starts == {1: 83, 2: 90, 3: 65, 4: 125}
+
+
+def test_extra_columns_in_ranking_are_not_voters(tmp_path):
+    import openpyxl
+
+    from chatting.config import VotingConfig
+    from chatting.master import compile_results, read_master, write_master
+    from chatting.models import Song, Vote
+    from chatting.names import People
+
+    songs = [Song(i, f"T{i}", "A", f"https://youtu.be/{i}", "Ana") for i in (1, 2)]
+    votes = [Vote("Bob", 1, 7.0), Vote("Bob", 2, 8.0), Vote("Cy", 1, 6.0)]
+    path = tmp_path / "master.xlsx"
+    write_master(compile_results(songs, ["Bob", "Cy"], votes, People(), VotingConfig()), path)
+
+    wb = openpyxl.load_workbook(path)
+    ws = wb["Ranking"]
+    notes = ws.max_column + 1
+    ws.cell(row=1, column=notes).value = "Notes"
+    ws.cell(row=2, column=notes).value = "check the link"
+    ws.insert_cols(1)
+    ws.cell(row=1, column=1).value = "Highlight"
+    ws.cell(row=2, column=1).value = 1
+    wb.save(path)
+
+    warnings = []
+    results = read_master(path, People(), VotingConfig(), warnings.append)
+    assert results.voters == ["Bob", "Cy"]
+    assert sum("isn't treated as a voter" in w for w in warnings) == 2

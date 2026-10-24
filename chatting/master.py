@@ -229,7 +229,20 @@ def read_master(
     idx = {h.casefold(): i for i, h in enumerate(headers) if h and h.casefold() in _FIXED}
     if "id" not in idx or "song" not in idx:
         raise SourceError(f"The 'Ranking' sheet in {path} needs 'ID' and 'Song' columns.")
-    voter_cols = [(i, h) for i, h in enumerate(headers) if h and h.casefold() not in _FIXED]
+    # Voters are the columns after ID that hold ratings; anything else the admin added
+    # (a "Notes" column, ...) is left out of the video.
+    voter_cols = []
+    for i, h in enumerate(headers):
+        if not h or h.casefold() in _FIXED:
+            continue
+        cells = [_text(r[i]) for r in rows[1:] if i < len(r) and _text(r[i])]
+        has_ratings = any(c.casefold() == OWN or parse_rating_value(c, voting.min, voting.max)[0] is not None
+                          for c in cells)
+        if i < idx["id"] or not has_ratings:
+            warn(f"Master sheet: column '{h}' isn't treated as a voter "
+                 f"({'it is before ID' if i < idx['id'] else 'it has no ratings'}).")
+            continue
+        voter_cols.append((i, h))
     voters = [h for _, h in voter_cols]
 
     def get(row: tuple, name: str) -> object:
