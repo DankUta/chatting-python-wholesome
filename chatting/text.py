@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -104,6 +105,13 @@ class FontSet:
     @property
     def has_emoji(self) -> bool:
         return self._emoji is not None
+
+    def describe(self) -> str:
+        """Which font files are in use, for `chatting check`."""
+        def name(face: Optional[_Face]) -> str:
+            return os.path.basename(face.path or face.source) if face else "none (Pillow's built-in font)"
+        emoji = name(self._emoji) if self._emoji else "none (emoji in comments will be left out)"
+        return f"regular {name(self._regular)}, bold {name(self._bold)}, emoji {emoji}"
 
     def _primary(self, bold: bool) -> Optional[_Face]:
         return self._bold if bold else self._regular
