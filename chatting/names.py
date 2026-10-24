@@ -3,24 +3,35 @@ file name and in the config ("Călin", "calin", "Calin_123")."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 from typing import Iterable, Mapping
 
 
+def _strip_accents(text: str) -> str:
+    text = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
+
+
 def normalize(name: object) -> str:
-    """Comparison key: accents removed, case-folded, letters and digits only."""
-    text = unicodedata.normalize("NFKD", str(name or ""))
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    return re.sub(r"[^0-9a-z]+", "", text.casefold())
+    """Comparison key: accents removed, case-folded, letters and digits only (any script).
+
+    A name with no letters or digits at all ("🦊") keeps its own case-folded text, so two
+    such people never share the empty key.
+    """
+    raw = " ".join(str(name or "").split())
+    key = re.sub(r"[\W_]+", "", _strip_accents(raw).casefold())
+    return key or raw.casefold()
 
 
 def slug(name: object) -> str:
     """Readable, file-system-safe version of a name ("Călin M." -> "calin-m")."""
-    text = unicodedata.normalize("NFKD", str(name or ""))
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^0-9a-zA-Z]+", "-", text.casefold()).strip("-")
-    return text or "unnamed"
+    raw = " ".join(str(name or "").split())
+    text = re.sub(r"[\W_]+", "-", _strip_accents(raw).casefold()).strip("-")
+    if text:
+        return text
+    return "person-" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:8] if raw else "unnamed"
 
 
 class People:
