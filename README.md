@@ -22,3 +22,11 @@ Before running the script, make sure you have the following installed on your ma
    Install the required packages via `pip`:
    ```bash
    pip install pandas pillow yt-dlp
+   ```
+
+   
+## 📋 TO DO
+
+1. Add small sleep between each download to not get limit rated by youtube
+2. Automate profile picture getter for each participant
+3. Each participant in the list should be taken from csv, not hard coded
