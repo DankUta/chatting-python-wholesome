@@ -1,0 +1,21 @@
+# Demo edition with made-up people. Try:
+#   python -m chatting -c examples/demo/chatting.toml compile
+#   python -m chatting -c examples/demo/chatting.toml preview --offline
+#   python -m chatting -c examples/demo/chatting.toml render --ranks 1-3
+
+[contest]
+title = "Chatting"
+edition = "Demo"
+
+[input]
+responses = "data/responses.csv"
+ratings_dir = "data/ratings"
+avatars_dir = "data/avatars"
+clips_dir = "data/clips"
+
+[people]
+"Călin" = ["calin", "Calin_B"]
+
+[video]
+clip_seconds = 15
+default_start = "0:30"

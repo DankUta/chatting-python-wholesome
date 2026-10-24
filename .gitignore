@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Generated per edition (keep your own data out of git)
+/output/
+/work/
+/data/
+/chatting.toml
+
+# Legacy script outputs
+temp_clips/
+temp_overlays/
+rendered_segments/
+concat_list.txt
+*.mp4
+
+# Demo edition outputs
+/examples/demo/output/
+/examples/demo/work/
