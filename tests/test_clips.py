@@ -46,7 +46,6 @@ def test_command_cache_and_sleep(tmp_path):
     assert "--no-playlist" in cmd and "--force-keyframes-at-cuts" in cmd
     assert cmd[cmd.index("--download-sections") + 1] == "*65.0-81.0"
     assert cmd[cmd.index("-f") + 1] == "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b"
-    assert cmd[-3:] == ["--cookies-from-browser", "firefox", song.link][-3:] or cmd[-1] == song.link
     assert cmd[-1] == song.link and "--cookies-from-browser" in cmd
     assert first.parent == cfg.work_dir / "clips" and first.suffix == ".mp4"
 
