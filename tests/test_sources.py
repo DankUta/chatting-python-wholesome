@@ -78,3 +78,17 @@ def test_duplicate_and_empty_headers(tmp_path):
     (tmp_path / "a.csv").write_text("Title,Title,,Title\na,b,c,d\n", encoding="utf-8")
     df = read_table("a.csv", tmp_path)
     assert list(df.columns) == ["Title", "Title.1", "Column 3", "Title.2"]
+
+
+def test_csv_from_romanian_excel_is_read_as_cp1250(tmp_path):
+    from chatting.sources import read_grid
+
+    path = tmp_path / "r.csv"
+    path.write_bytes("Name;Song\nŞtefan;Ţară\nAndré;Café\n".encode("cp1250"))
+    grid = read_grid(str(path), tmp_path)
+    assert grid.iloc[1, 0] == "Ştefan" and grid.iloc[1, 1] == "Ţară"
+    assert grid.iloc[2, 0] == "André"
+
+    western = tmp_path / "w.csv"
+    western.write_bytes("Name;Song\nJosé;Niño\n".encode("cp1252"))
+    assert read_grid(str(western), tmp_path).iloc[1, 0] == "José"

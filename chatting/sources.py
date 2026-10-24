@@ -92,7 +92,13 @@ def _decode(data: bytes) -> str:
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
-        return data.decode("cp1252", errors="replace")
+        pass
+    # Not UTF-8: a CSV saved by Excel in the Windows code page. Romanian (and other Central
+    # European) Excel uses cp1250, whose ş ţ Ş Ţ come out as º þ ª Þ when read as cp1252.
+    western = data.decode("cp1252", errors="replace")
+    if any(ch in western for ch in "ºªþÞ"):
+        return data.decode("cp1250", errors="replace")
+    return western
 
 
 def _read_text_grid(text: str) -> pd.DataFrame:
